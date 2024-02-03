@@ -23,4 +23,4 @@ def get_answer(snapchat_messages):
 
 
 # print(response)
-# print(get_answer([{'role': 'user', 'content': 'Привет'}]))
+print(get_answer([{'role': 'user', 'content': 'Привет'}]))

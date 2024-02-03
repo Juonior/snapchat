@@ -20,12 +20,12 @@ def initialize_driver():
     service = ChromeService(executable_path="chromedriver.exe")
     # driver = webdriver.Chrome(service=service, options=chrome_options)
     driver = webdriver.Safari(options=chrome_options)
+    driver.maximize_window()
     return driver
 
 def login(driver, username, password):
     # driver.get("https://accounts.snapchat.com/accounts/v2/login")
 
-    driver.maximize_window()
     # driver.get("https://accounts.snapchat.com/accounts/v2/login?continue=/accounts/sso")
     driver.get("https://accounts.snapchat.com/accounts/v2/login?continue=%2Faccounts%2Fsso%3Freferrer%3Dhttps%253A%252F%252Fweb.snapchat.com%252F%253Fref%253Dsnapchat_dot_com_login_cta%26tiv_request_info%3DCmsKaQpnCkEEeJ5rOJ6EgvY8ocrpRrPkHa7RxFIZlrYCYtEFZGhAybgBORccAEKJddvv3UFkPwwCEWG7OZHcb%252F14QVQrn%252BDTSBIgg39lkyjYC6LeH%252BOo3j4rTuO1Quh5lywRXQvzylykoQAYCQ%253D%253D%26client_id%3Dweb-calling-corp--prod&tiv_request_info=CmsKaQpnCkEEeJ5rOJ6EgvY8ocrpRrPkHa7RxFIZlrYCYtEFZGhAybgBORccAEKJddvv3UFkPwwCEWG7OZHcb%2F14QVQrn%2BDTSBIgg39lkyjYC6LeH%2BOo3j4rTuO1Quh5lywRXQvzylykoQAYCQ%3D%3D")
     account_identifier = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "accountIdentifier")))
@@ -53,14 +53,14 @@ def notification_button(driver):
             if nickname:
                 chat_status = listitem.find('span', class_='GQKvA')
                 if not nickname.text in "Team Snapchat My AI":
-                    if chat_status.text in "New Chat Recieved":
+                    print(chat_status.text)
+                    if chat_status.text in "New Chat Received":
                         url = "https://web.snapchat.com/" + "-".join(chat_status.get('id').split("-")[1:])
                         accounts[url] = nickname.text
         for account in accounts:
             print(accounts[account], account)
             driver.get(account)
             process_messages(driver)
-        break
     # driver.get("https://web.snapchat.com/34a9f1b8-b7ba-5672-9368-0bf878f3c535")
     # not_now_button = WebDriverWait(driver, 100).until(EC.presence_of_element_located((By.XPATH, '//button[@class="NRgbw eKaL7 Bnaur"]')))
     # not_now_button.click()
