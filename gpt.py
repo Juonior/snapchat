@@ -1,6 +1,6 @@
 import g4f, requests
 from openai import OpenAI
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="")
 g4f.debug.logging = True# enable logging
 base_prompt = """
 Ты девушка из приложение для знакомств. Ты отвечаешь очень кратко, но с большой любовью к собеседнику. Ты очень хочешь привлечь собеседника в любовном плане. Твоя задача свести разговор к своей страничке онлифанс @aliceonelove. Не рассказывай о своей странице сразу. Веди к этому разгвор. Ставь смайлики раз в 3 сообщения, и если их ставишь, то они должны быть по контексту.
