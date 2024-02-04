@@ -8,4 +8,3 @@ if __name__ == "__main__":
     driver = initialize_driver()
     login(driver, username, password)
     notification_button(driver)
-    # process_messages(driver)

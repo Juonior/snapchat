@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -18,8 +19,8 @@ def initialize_driver():
     chrome_options.add_argument("--use-fake-device-for-media-stream")
     chrome_options.add_argument("--use-file-for-fake-video-capture=D:\\output.mjpeg")
     service = ChromeService(executable_path="chromedriver.exe")
-    # driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver = webdriver.Safari(options=chrome_options)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    # driver = webdriver.Safari(options=chrome_options)
     driver.maximize_window()
     return driver
 
@@ -28,6 +29,9 @@ def login(driver, username, password):
 
     # driver.get("https://accounts.snapchat.com/accounts/v2/login?continue=/accounts/sso")
     driver.get("https://accounts.snapchat.com/accounts/v2/login?continue=%2Faccounts%2Fsso%3Freferrer%3Dhttps%253A%252F%252Fweb.snapchat.com%252F%253Fref%253Dsnapchat_dot_com_login_cta%26tiv_request_info%3DCmsKaQpnCkEEeJ5rOJ6EgvY8ocrpRrPkHa7RxFIZlrYCYtEFZGhAybgBORccAEKJddvv3UFkPwwCEWG7OZHcb%252F14QVQrn%252BDTSBIgg39lkyjYC6LeH%252BOo3j4rTuO1Quh5lywRXQvzylykoQAYCQ%253D%253D%26client_id%3Dweb-calling-corp--prod&tiv_request_info=CmsKaQpnCkEEeJ5rOJ6EgvY8ocrpRrPkHa7RxFIZlrYCYtEFZGhAybgBORccAEKJddvv3UFkPwwCEWG7OZHcb%2F14QVQrn%2BDTSBIgg39lkyjYC6LeH%2BOo3j4rTuO1Quh5lywRXQvzylykoQAYCQ%3D%3D")
+    cookie_accept = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Accept All"]')))
+    cookie_accept.click()
+
     account_identifier = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "accountIdentifier")))
     account_identifier.send_keys(username)
     time.sleep(1)
@@ -37,10 +41,12 @@ def login(driver, username, password):
     password_field.send_keys(password)
     next_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//div[@class="primary_action login-button"]/button[@data-testid="password-submit-button"]')))
     next_button.click()
-    time.sleep(5)
+    time.sleep(1)
 
 def notification_button(driver):
     driver.get("https://web.snapchat.com/accounts/sso")
+    cookie_accept = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Not now"]')))
+    cookie_accept.click()
     while True:
         accounts = {}
         listitems = []
@@ -53,21 +59,32 @@ def notification_button(driver):
             if nickname:
                 chat_status = listitem.find('span', class_='GQKvA')
                 if not nickname.text in "Team Snapchat My AI":
-                    print(chat_status.text)
-                    if chat_status.text in "New Chat Received":
-                        url = "https://web.snapchat.com/" + "-".join(chat_status.get('id').split("-")[1:])
-                        accounts[url] = nickname.text
+                    if chat_status:
+                        # print(chat_status.text)
+                        if chat_status.text in "New Chat Received":
+                            url = "https://web.snapchat.com/" + "-".join(chat_status.get('id').split("-")[1:])
+                            accounts[url] = nickname.text
         for account in accounts:
             print(accounts[account], account)
-            driver.get(account)
+            if driver.current_url != account:
+                driver.get(account)
             process_messages(driver)
     # driver.get("https://web.snapchat.com/34a9f1b8-b7ba-5672-9368-0bf878f3c535")
     # not_now_button = WebDriverWait(driver, 100).until(EC.presence_of_element_located((By.XPATH, '//button[@class="NRgbw eKaL7 Bnaur"]')))
     # not_now_button.click()
 
 def process_messages(driver):
-    dialog_div = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="IBqK8"]')))
-    dialog_div.click()
+    try:
+        dialog_div = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="IBqK8"]')))
+        try:
+            dialog_div.click()
+        except ElementClickInterceptedException:
+            cookie_accept = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Not now"]')))
+            cookie_accept.click()
+            time.sleep(0.5)
+            dialog_div.click()
+    except:
+        pass
     time.sleep(1)
     page_source = driver.page_source
     soup = BeautifulSoup(page_source, 'html.parser')
@@ -90,21 +107,22 @@ def process_user_message(driver, messages):
     if messages[-1]["role"] == "user":
         while True:
             try:
+                print(messages)
                 raw_answer = get_answer(messages)
                 break
             except:
                 print("Cant get Answer from GPT. Waiting 3 seconds")
                 time.sleep(3)
-        answer = raw_answer.replace("📸", "").replace("[фото]", "").replace("фото", "")
+        answer = raw_answer.replace("📸", "").replace("[фото]", "").replace('"фото"', "")
         print(answer)
 
-        # chat_box = WebDriverWait(driver, 10).until(
-        #     EC.presence_of_element_located((By.XPATH, '//div[@role="textbox"][@placeholder="Send a chat"]'))
-        # )
-        # chat_box.click()
-        # keyboard.write(answer)
-        # time.sleep(0.5)
-        # keyboard.press_and_release('enter')
+        chat_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//div[@role="textbox"][@placeholder="Send a chat"]'))
+        )
+        chat_box.click()
+        keyboard.write(answer)
+        time.sleep(0.5)
+        keyboard.press_and_release('enter')
 
         if "фото" in raw_answer or "📸" in raw_answer:
             send_photo(driver)
@@ -113,10 +131,10 @@ def send_photo(driver):
     source_path = 'photo'
     destination_path = 'D:\\output.mjpeg'
 
-    file_to_move = random.choice(os.listdir(source_path))
-    source_file_path = os.path.join(source_path, file_to_move)
+    # file_to_move = random.choice(os.listdir(source_path))
+    # source_file_path = os.path.join(source_path, file_to_move)
 
-    shutil.move(source_file_path, destination_path)
+    # shutil.move(source_file_path, destination_path)
 
     snapshot_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "cDumY")))
     snapshot_button.click()
@@ -124,10 +142,10 @@ def send_photo(driver):
     take_snapshot = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "FBYjn")))
     take_snapshot.click()
 
-    send_to_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send To"]')))
-    send_to_element.click()
+    # send_to_element = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send To"]')))
+    # send_to_element.click()
 
-    send_to_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send"]')))
+    send_to_element = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send"]')))
     send_to_element.click()
     time.sleep(1)
     print(driver.page_source)
