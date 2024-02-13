@@ -14,6 +14,36 @@ from crop import changephoto_to_camera
 import random
 last_messages_answered = {}
 answers_cache = {}
+import json
+
+ignored_users = []
+
+def load_ignored_users():
+    ignored_users = []
+    try:
+        with open('ignored_users.json', 'r') as file:
+            ignored_users = json.load(file)
+    except FileNotFoundError:
+        pass  # Если файл не найден, просто возвращаем пустой список игнорируемых пользователей
+    return ignored_users
+
+def write_to_json(user_name):
+    ignored_users = load_ignored_users()
+    ignored_users.append(user_name)
+    with open('ignored_users.json', 'w') as file:
+        json.dump(ignored_users, file)
+
+
+def write_text(message):
+
+    characters_per_minute = 120 * 5
+    characters_per_second = characters_per_minute / 60
+    
+    delay_per_char = 1 / characters_per_second
+    
+    for char in message:
+        keyboard.write(char)
+        time.sleep(delay_per_char)
 def initialize_driver():
     chrome_options = Options()
     chrome_options.add_experimental_option("detach", True)
@@ -46,9 +76,19 @@ def login(driver, username, password):
     time.sleep(1)
 
 def notification_button(driver):
+    global ignored_users
+    ignored_users = load_ignored_users()
+
     driver.get("https://web.snapchat.com/accounts/sso")
-    cookie_accept = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Not now"]')))
-    cookie_accept.click()
+    while True:
+        try:
+            cookie_accept = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Not now"]')))
+            cookie_accept.click()
+            break
+        except:
+            pass
+    #cookie_accept = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Not now"]')))
+    #cookie_accept.click()
     while True:
         accounts = {}
         listitems = []
@@ -67,15 +107,13 @@ def notification_button(driver):
                             url = "https://web.snapchat.com/" + "-".join(chat_status.get('id').split("-")[1:])
                             accounts[url] = nickname.text
         for account in accounts:
-            print(accounts[account], account)
-            if driver.current_url != account:
-                driver.get(account)
-            process_messages(driver,accounts[account])
-    # driver.get("https://web.snapchat.com/34a9f1b8-b7ba-5672-9368-0bf878f3c535")
-    # not_now_button = WebDriverWait(driver, 100).until(EC.presence_of_element_located((By.XPATH, '//button[@class="NRgbw eKaL7 Bnaur"]')))
-    # not_now_button.click()
+            if accounts[account] not in ignored_users:
+                print(accounts[account], account)
+                if driver.current_url != account:
+                    driver.get(account)
+                process_messages(driver, accounts[account])
 
-def process_messages(driver,user_name):
+def process_messages(driver, user_name):
     try:
         dialog_div = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="IBqK8"]')))
         try:
@@ -102,7 +140,7 @@ def process_messages(driver,user_name):
                 messages.append({"role": sender, "content": user_messages.replace("snap", "photo").replace("снап", "фото")})
 
     if len(messages) > 0:
-        process_user_message(driver, messages,user_name)
+        process_user_message(driver, messages, user_name)
 
 def process_user_message(driver, messages, user_name):
     last_message = messages[-1]
@@ -124,19 +162,27 @@ def process_user_message(driver, messages, user_name):
 
             # Store the answer in the cache
             answers_cache[user_message_key] = raw_answer
+
         answer = raw_answer.replace("📸", "").replace("[фото]", "").replace('"фото"', "").replace("[photo]","")
         print(answer)
+        messages_answer = answer.split("\n")
         # Continue with sending the answer and photo if applicable
         chat_box = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, '//div[@role="textbox"][@placeholder="Send a chat"]'))
         )
         chat_box.click()
-        keyboard.write(answer)
-        time.sleep(0.5)
-        keyboard.press_and_release('enter')
+        for msg in messages_answer:
+            write_text(msg)
+            time.sleep(0.5)
+            keyboard.press_and_release('enter')
 
         if "фото" in raw_answer or "📸" in raw_answer or "photo" in raw_answer.lower():
             send_photo(driver, user_name)
+        # Check if the raw answer contains "45456"
+        if "45456" in raw_answer:
+            write_to_json(user_name)
+            ignored_users.append(user_name)
+            return
 def send_photo(driver, user_name):
     source_path = "C:\\Users\\Administrator\\Desktop\\photo"
     log_file_path = 'sent_photos_log.json'
@@ -170,16 +216,14 @@ def send_photo(driver, user_name):
             json.dump(sent_photos_log, log_file)
 
         # Rest of your existing code for sending the photo
-        snapshot_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "cDumY")))
+        snapshot_button = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CLASS_NAME, "cDumY")))
         snapshot_button.click()
 
-        take_snapshot = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "FBYjn")))
+        take_snapshot = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CLASS_NAME, "FBYjn")))
         take_snapshot.click()
-
-        send_to_element = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send"]')))
+        
+        send_to_element = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, '//span[@class="nonIntl" and text()="Send"]')))
         send_to_element.click()
 
-        time.sleep(1)
-        # print(driver.page_source)
     else:
         print(f"No unsent photos available for {user_name}")
